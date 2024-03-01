@@ -1,6 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 import re
+import config
 
 def get_content(url):
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
@@ -61,7 +62,17 @@ def edit_text(text, maxlen = 1000):
         return text
     text = re.sub(r'[^\n]*$', '', text)
     return text
-    
+
+def get_all():
+    res = ""
+    for url in config.URL:
+        soup = get_content(url)
+        res += get_title(soup)
+        res += edit_text(get_text(soup))
+        if config.HASHTAG == "on":
+            res += ",".join(get_tags(soup))
+    return res
+
 def main():
     url = 'https://forklog.com/news/sutochnyj-pritok-v-bitkoin-etf-dostig-rekordnyh-673-mln'
     soup = get_content(url)
