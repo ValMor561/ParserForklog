@@ -33,10 +33,3 @@ class BDRequests():
         cursor.execute(function_call_query, (url,))
         result = cursor.fetchone()[0]
         return result
-
-BD = BDRequests()
-BD.insert_url("testurl")
-print(BD.check_url_exist("testurl"))
-BD.clear_database()
-print(BD.check_url_exist("testurl"))
-

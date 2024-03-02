@@ -18,7 +18,7 @@ all_week_days = ["понедельник", "вторник", "среда", "че
 config = get_config('config.ini')
 BOT_TOKEN = config['DEFAULT']['bot_token']
 CHANELL_ID = config['DEFAULT']['channels_id']
-ADMINS = config['DEFAULT']['admins']
+ADMINS = config['DEFAULT']['admins'].replace(" ", "").split(",")
 PROXY = get_multiple_values(config['PROXY']['proxy'])
 WORK_DAYS = all_week_days if config['SETTINGS']['work_days'] == '*' else config['SETTINGS']['work_days']
 WORK_START_TIME = config['SETTINGS']['work_start_time']
