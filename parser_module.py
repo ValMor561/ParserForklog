@@ -3,6 +3,7 @@ from bs4 import BeautifulSoup
 import re
 import config
 import random
+import bd
 
 def get_proxy():
     https_proxy = random.choice(config.PROXY)   
@@ -32,7 +33,15 @@ def get_content(url):
         return soup
     else:
         return -1
-    
+
+def get_href(soup):
+    divs = soup.find_all(class_='post_item')
+    all_url = []
+    for div in divs:
+        url = div.find('a')
+        all_url.append(url['href'])
+    return all_url
+
 def get_title(soup):
     if soup == -1:
         return
@@ -80,28 +89,27 @@ def edit_text(text, maxlen = 1000):
     text = re.sub(r'[^\n]*$', '', text)
     return text
 
-def get_all():
-    result = []
-    for url in config.URL:
-        page = ""
-        soup = get_content(url)
-        page += "<u><b>" + get_title(soup) + "</b></u>\n\n"
-        maxlen = 1000 if  config.TEXT_LENGTH == '*' else int(config.TEXT_LENGTH)
-        page += edit_text(get_text(soup), maxlen)
-        if config.TEXT != "":
-            page += config.TEXT + "\n"
-        if config.HASHTAG == "on":
-            page += ", ".join(get_tags(soup))
-        result.append(page)
-    return result
+def get_page(url):
+    soup = get_content(url)
+    page = ""
+    page += "<u><b>" + get_title(soup) + "</b></u>\n\n"
+    page += edit_text(get_text(soup), config.TEXT_LENGTH )
+    if config.TEXT != "":
+        page += config.TEXT + "\n"
+    if config.HASHTAG == "on":
+        page += ", ".join(get_tags(soup))
+    return page
 
 def main():
     url = 'https://forklog.com/news'
     soup = get_content(url)
-    get_title(soup)
-    get_tags(soup)
-    text = get_text(soup)
-    print(edit_text(text))
+    urls = get_href(soup)
+    for url in urls:
+        soup = get_content(url)
+        get_title(soup)
+        get_tags(soup)
+        text = get_text(soup)
+        print(edit_text(text))
 
 if __name__ == "__main__":
     main()
