@@ -10,7 +10,6 @@ from handlers import router
 
 
 async def main():
-    CF = config
     bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.HTML)
     dp = Dispatcher(storage=MemoryStorage())
     dp.include_router(router)

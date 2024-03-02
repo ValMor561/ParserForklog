@@ -2,10 +2,29 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import config
+import random
+
+def get_proxy():
+    https_proxy = random.choice(config.PROXY)   
+    proxies = {
+        'https': https_proxy
+    }
+    return proxies
 
 def get_content(url):
     headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
-    response = requests.get(url, headers=headers)
+    count_try = 0
+    if config.PROXY[0] != "off":
+        while count_try != 10:
+            proxies = get_proxy()
+            try:
+                response = requests.get(url=url, headers=headers, proxies=proxies)
+            except requests.exceptions.ProxyError:
+                count_try += 1
+            finally:
+                break
+    else:
+        response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
         html_content = response.text
@@ -19,7 +38,6 @@ def get_title(soup):
         return
     
     title = soup.title.string
-    print(title)
     return title
 
 def get_tags(soup):
@@ -29,9 +47,7 @@ def get_tags(soup):
 
     tags = soup.find(class_='post_tags_top').find_all('a')
     for tag in tags:
-        print(tag.text)
-        res.append(tag.text.replace("#",""))
-    print(res)
+        res.append(tag.text.replace(" ", "_"))
     return res
 
 def get_text(soup):
@@ -41,6 +57,8 @@ def get_text(soup):
 
     paragraphs = soup.find(class_='post_content').find_all('p', class_=False, recursive=True)
     for paragraph in paragraphs:
+        if paragraph.text == "":
+            continue
         if paragraph.find_parent(['blockquote']) is not None:
             continue
         if paragraph.find_parent(['div'])['class'][0] != 'post_content':
@@ -52,29 +70,33 @@ def get_text(soup):
             elif isinstance(element, str):  
                 paragraph_text += element 
         res += paragraph_text + '\n'
-    print(res)
     return(res)
 
 def edit_text(text, maxlen = 1000):
     text = text[0:maxlen]
     if maxlen != 1000:
-        text += "..."
+        text += "...\n\n"
         return text
     text = re.sub(r'[^\n]*$', '', text)
     return text
 
 def get_all():
-    res = ""
+    result = []
     for url in config.URL:
+        page = ""
         soup = get_content(url)
-        res += get_title(soup)
-        res += edit_text(get_text(soup))
+        page += "<u><b>" + get_title(soup) + "</b></u>\n\n"
+        maxlen = 1000 if  config.TEXT_LENGTH == '*' else int(config.TEXT_LENGTH)
+        page += edit_text(get_text(soup), maxlen)
+        if config.TEXT != "":
+            page += config.TEXT + "\n"
         if config.HASHTAG == "on":
-            res += ",".join(get_tags(soup))
-    return res
+            page += ", ".join(get_tags(soup))
+        result.append(page)
+    return result
 
 def main():
-    url = 'https://forklog.com/news/sutochnyj-pritok-v-bitkoin-etf-dostig-rekordnyh-673-mln'
+    url = 'https://forklog.com/news'
     soup = get_content(url)
     get_title(soup)
     get_tags(soup)

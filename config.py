@@ -2,7 +2,7 @@ import configparser
 
 def get_config(filename):
     config = configparser.ConfigParser()
-    config.read(filename)
+    config.read(filename, encoding="utf-8")
 
     return config
 
@@ -16,7 +16,7 @@ def get_multiple_values(param):
 
 config = get_config('config.ini')
 BOT_TOKEN = config['DEFAULT']['bot_token']
-CHANEL_ID = config['DEFAULT']['channels_id']
+CHANELL_ID = config['DEFAULT']['channels_id']
 ADMINS = config['DEFAULT']['admins']
 PROXY = get_multiple_values(config['PROXY']['proxy'])
 WORK_DAYS = config['SETTINGS']['work_days']
