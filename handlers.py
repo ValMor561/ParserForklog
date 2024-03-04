@@ -10,55 +10,80 @@ import bd
 from time import sleep
 import datetime
 import pytz
-import schedule
+import os
+import sys
 
 router = Router()
 BD = bd.BDRequests()
 RUNNING = True
 
-async def check_schedule(chat_id):
+#Функия для запуска парсинга с проверкой по времени
+async def run_bot(msg: Message):
     now = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
-    current_day = now.strftime("%A").lower()
+    all_week_days = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
+    current_day = now.weekday()
 
-    if current_day in config.WORK_DAYS:
+    if all_week_days[current_day] in config.WORK_DAYS:
         current_time = now.strftime("%H:%M")
         if config.WORK_START_TIME <= current_time <= config.WORK_END_RIME:
-            if  current_time in config.WORK_TIME:
-                await start_handler()
-            elif config.WORK_PERIOD != "off" and now.minute % config.WORK_PERIOD == 0:
-                await start_handler()
+            #Если включен параметр work_time сравниваем с текущим временем иначе просто запускаем
+            if config.WORK_TIME != "off":
+                if current_time in config.WORK_TIME:
+                    await start_handler()
+                    return
+            #Запускаем парсинг только в случае периодического запуска
+            if config.WORK_PERIOD != "off":
+                await start_handler(msg)
 
-@router.message()
+#Бесконечный цикл с запуском функции парсинга каждую минуту либо через определенный период
+async def scheduled(msg: Message):
+    while True:
+        await run_bot(msg)
+        if config.WORK_PERIOD != "off":
+            await asyncio.sleep(int(config.WORK_PERIOD)*60)
+        else:
+            await asyncio.sleep(60)
+
+#Ограничение доступа пользователям, которых нет в списке
+@router.message(lambda message:str(message.from_user.id) not in config.ADMINS)
 async def check_user_id(msg: Message):
-    if str(msg.from_user.id) not in config.ADMINS:
-        await msg.answer("Нет доступа")
-        return
+    await msg.answer("Нет доступа")
+    return
 
-
+#Функция парсинга запускается командой post либо по расписанию функцией run_bot
 @router.message(Command("post"))
 async def start_handler(msg: Message):
+    #Переменная для остановки
     global RUNNING
     RUNNING = True
+    #Обработка всех ссылок в конфиге
     for url in config.URL:
+        #Получение ссылок из категории
         soup = parser_module.get_content(url)
         URLS = parser_module.get_href(soup)
         for URL in URLS:
             if not RUNNING:
                 return 
+            #Отсев дублей
             if BD.check_url_exist(URL):
                 continue
+            #Получение текста
             text = parser_module.get_page(URL)
             BD.insert_url(URL)
             try:
+                #Отправка в канал
                 await msg.bot.send_message(text=text, parse_mode='html', chat_id=config.CHANELL_ID)
+            #В случае превышения лимита телеграма подождать указаное время
             except TelegramRetryAfter as e:
                 sleep(e.retry_after)
                 await msg.bot.send_message(text=text, parse_mode='html', chat_id=config.CHANELL_ID)
 
+#Запуск бота и вход в режим бесконечного цикла
 @router.message(Command("start"))
 async def cmd_start(msg: Message):
     global RUNNING
     RUNNING = True
+    #Добавление кнопок
     kb = [
         [types.KeyboardButton(text='/post', callback_data='post'),
         types.KeyboardButton(text='/clean_bd', callback_data='clean_bd')],
@@ -66,18 +91,25 @@ async def cmd_start(msg: Message):
         types.KeyboardButton(text='/stop', callback_data='stop')]
     ]
     keyboard = types.ReplyKeyboardMarkup(keyboard=kb)
-    await msg.answer("Бот запущен", reply_markup=keyboard)
-
+    await msg.answer("Бот запущен\nКоманды:\n/post - Единоразовый запуск парсера\n/clean_bd - Очистка базы данных с посещенными ссылками\n/restart - Перезапуск всего бота\n/stop - Остановка функции парсинга", reply_markup=keyboard)
+    await scheduled(msg)
+    
+#Очистка базы данных с ссылками
 @router.message(Command("clean_bd"))
 async def clear_database(msg: Message):
     BD.clear_database()
     await msg.answer("База данных очищена")
 
+#Остановка функции парсинга
 @router.message(Command("stop"))
 async def process_callback_stop(callback_query: types.CallbackQuery):
     global RUNNING
     RUNNING = False
 
-
-
+#Перезапуск бота
+@router.message(Command("restart"))
+async def restart(msg: Message):
+    await msg.answer("Перезапуск бота...\n Для запуска функционала нажмите /start")
+    python = sys.executable
+    os.execl(python, python, *sys.argv)
     
