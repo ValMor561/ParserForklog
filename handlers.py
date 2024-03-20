@@ -16,6 +16,7 @@ import sys
 router = Router()
 BD = bd.BDRequests()
 RUNNING = True
+STAT = False
 
 #Функия для запуска парсинга с проверкой по времени
 async def run_bot(msg: Message):
@@ -25,6 +26,7 @@ async def run_bot(msg: Message):
 
     if all_week_days[current_day] in config.WORK_DAYS:
         current_time = now.strftime("%H:%M")
+        print(current_time)
         if config.WORK_START_TIME <= current_time <= config.WORK_END_RIME:
             #Если включен параметр work_time сравниваем с текущим временем иначе просто запускаем
             if config.WORK_TIME != "off":
@@ -53,6 +55,9 @@ async def check_user_id(msg: Message):
 #Функция парсинга запускается командой post либо по расписанию функцией run_bot
 @router.message(Command("post"))
 async def start_handler(msg: Message):
+    global STAT
+    if STAT:
+        await msg.answer("Начат обход ссылок")
     #Переменная для остановки
     global RUNNING
     RUNNING = True
@@ -72,11 +77,18 @@ async def start_handler(msg: Message):
             BD.insert_url(URL)
             try:
                 #Отправка в канал
-                await msg.bot.send_message(text=text, parse_mode='html', chat_id=config.CHANELL_ID)
+                channels_id = config.CHANELLS_ID
+                for channel in channels_id:
+                    await msg.bot.send_message(text=text, parse_mode='html', chat_id=channel)
             #В случае превышения лимита телеграма подождать указаное время
             except TelegramRetryAfter as e:
                 sleep(e.retry_after)
-                await msg.bot.send_message(text=text, parse_mode='html', chat_id=config.CHANELL_ID)
+                channels_id = config.CHANELLS_ID
+                for channel in channels_id:
+                    await msg.bot.send_message(text=text, parse_mode='html', chat_id=channel)
+        if STAT:            
+            await msg.answer("Все ссылки проверены")
+        
 
 #Запуск бота и вход в режим бесконечного цикла
 @router.message(Command("start"))
@@ -89,9 +101,10 @@ async def cmd_start(msg: Message):
         types.KeyboardButton(text='/clean_bd', callback_data='clean_bd')],
         [types.KeyboardButton(text='/restart', callback_data='restart'),
         types.KeyboardButton(text='/stop', callback_data='stop')]
+        [types.KeyboardButton(text='/stats', callback_data='stats')]
     ]
     keyboard = types.ReplyKeyboardMarkup(keyboard=kb)
-    await msg.answer("Бот запущен\nКоманды:\n/post - Единоразовый запуск парсера\n/clean_bd - Очистка базы данных с посещенными ссылками\n/restart - Перезапуск всего бота\n/stop - Остановка функции парсинга", reply_markup=keyboard)
+    await msg.answer("Бот запущен\nКоманды:\n/post - Единоразовый запуск парсера\n/clean_bd - Очистка базы данных с посещенными ссылками\n/restart - Перезапуск всего бота\n/stop - Остановка функции парсинга\n/stats - Включить\отключить отчетность", reply_markup=keyboard)
     await scheduled(msg)
     
 #Очистка базы данных с ссылками
@@ -102,9 +115,21 @@ async def clear_database(msg: Message):
 
 #Остановка функции парсинга
 @router.message(Command("stop"))
-async def process_callback_stop(callback_query: types.CallbackQuery):
+async def process_callback_stop(msg: Message):
     global RUNNING
     RUNNING = False
+    await msg.answer("Обход остановлен")
+
+#Остановка функции парсинга
+@router.message(Command("stats"))
+async def process_callback_stop(msg: Message):
+    global STAT
+    if STAT:
+        STAT = False
+        await msg.answer("Статистика выключена")
+    else:
+        STAT = False
+        await msg.answer("Статистика включена")
 
 #Перезапуск бота
 @router.message(Command("restart"))

@@ -5,9 +5,24 @@ import config
 import random
 import bd
 
+def transform_to_http_format(input_string):
+    parts = input_string.split(":")
+    ip = parts[0]
+    port = parts[1]
+    login = parts[2] if len(parts) > 2 else ""
+    password = parts[3] if len(parts) > 3 else ""
+    
+    if login and password:
+        http_formatted_string = f"http://{login}:{password}@{ip}:{port}"
+    else:
+        http_formatted_string = f"http://{ip}:{port}"
+    
+    return http_formatted_string
+
 #Выбор случайного прокси
 def get_proxy():
-    https_proxy = random.choice(config.PROXY)   
+    proxy = random.choice(config.PROXY)   
+    https_proxy = transform_to_http_format(proxy)
     proxies = {
         'https': https_proxy
     }
@@ -19,20 +34,19 @@ def get_content(url):
     count_try = 0
     if config.PROXY[0] != "off":
         #Перебор прокси если не получилось подключиться
-        while count_try != 10:
+        while count_try != 3:
             proxies = get_proxy()
             try:
                 response = requests.get(url=url, headers=headers, proxies=proxies)
             except requests.exceptions.ProxyError:
+                print("Прокси не подошла пробую другую")
                 count_try += 1
-            finally:
-                break
     #Подключение без прокси
     else:
         response = requests.get(url, headers=headers)
     #Если ни одна прокси не подошла
-    if count_try == 10:
-         response = requests.get(url, headers=headers)
+    if count_try == 3:
+        response = requests.get(url, headers=headers)
 
     if response.status_code == 200:
         html_content = response.text
@@ -77,9 +91,6 @@ def get_text(soup):
 
     paragraphs = soup.find(class_='post_content').find_all('p', class_=False, recursive=True)
     for paragraph in paragraphs:
-        #Удаление пустых абзацев
-        if paragraph.text == "":
-            continue
         #Удаление цитат
         if paragraph.find_parent(['blockquote']) is not None:
             continue
@@ -93,7 +104,10 @@ def get_text(soup):
                 paragraph_text += element.text  
             elif isinstance(element, str):  
                 paragraph_text += element 
-        res += paragraph_text + '\n'
+        #Удаление пустых абзацев
+        if paragraph_text == "" or paragraph_text == ' ':
+            continue
+        res += paragraph_text + '\n\n'
     return(res)
 
 #Обработка длинны текста
@@ -110,12 +124,15 @@ def edit_text(text, maxlen = 1000):
 def get_page(url):
     soup = get_content(url)
     page = ""
-    page += "<u><b>" + get_title(soup) + "</b></u>\n\n"
-    page += edit_text(get_text(soup), config.TEXT_LENGTH)
-    #Добавление дополнительного текста
-    if config.TEXT != "":
-        page += config.TEXT + "\n"
+    page += "<b>" + get_title(soup) + "</b>\n"
     #Добавление хэштегов
     if config.HASHTAG == "on":
         page += ", ".join(get_tags(soup))
+    page += "\n\n" + edit_text(get_text(soup), config.TEXT_LENGTH)
+    #Добавление дополнительного текста
+    if config.TEXT != "":
+        if config.TEXT_URL == "":
+            page += config.TEXT + "\n"
+        else:
+            page += f'<a href="{config.TEXT_URL}">{config.TEXT}</a>' + "\n"    
     return page
