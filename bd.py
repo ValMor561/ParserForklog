@@ -34,7 +34,6 @@ class BDRequests():
     #Проверка хранится ли ссылка в таблице
     def check_url_exist(self, url):
         cursor = self.connection.cursor()
-        function_call_query = "SELECT check_url_exists(%s);"
-        cursor.execute(function_call_query, (url,))
+        cursor.execute("SELECT check_url_exists(%s, %s)", (url, config.TABLENAME))
         result = cursor.fetchone()[0]
         return result

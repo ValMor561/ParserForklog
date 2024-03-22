@@ -38,6 +38,7 @@ def get_content(url):
             proxies = get_proxy()
             try:
                 response = requests.get(url=url, headers=headers, proxies=proxies)
+                break
             except requests.exceptions.ProxyError:
                 print("Прокси не подошла пробую другую")
                 count_try += 1
@@ -54,6 +55,15 @@ def get_content(url):
         return soup
     else:
         return -1
+
+#Получение времени последнего поста
+def get_time():
+    res = "Названия последних постов:\n"
+    for url in config.URL:
+        soup = get_content(url)
+        time = soup.find(class_="text_blk").find('p').text
+        res += f'{url} - {time}\n'
+    return res
 
 #Получение всех ссылок с категории
 def get_href(soup):

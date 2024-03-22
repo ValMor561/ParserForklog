@@ -1,3 +1,4 @@
 *.txt
 config.ini
 __pycache__
+!requirements.txt
