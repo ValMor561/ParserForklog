@@ -4,6 +4,8 @@ import re
 import config
 import random
 import bd
+from datetime import datetime
+
 
 def transform_to_http_format(input_string):
     parts = input_string.split(":")
@@ -65,13 +67,26 @@ def get_time():
         res += f'{url} - {time}\n'
     return res
 
+#Удаление парметров
+def delete_param(url):
+    match = re.match(r'([^?]*)\?', url)
+    if match:
+        return match.group(1)
+    else:
+        return url
+
 #Получение всех ссылок с категории
 def get_href(soup):
     divs = soup.find_all(class_='post_item')
     all_url = []
     for div in divs:
         url = div.find('a')
-        all_url.append(url['href'])
+        url = delete_param(url['href'])
+
+        date = div.find(class_='post_date').text
+        today = datetime.now().strftime("%d.%m.%Y")
+        if today == date:
+            all_url.append(url)
     return all_url
 
 #Получение названия поста
