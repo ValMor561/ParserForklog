@@ -1,5 +1,4 @@
 import random
-import bd
 import requests
 from bs4 import BeautifulSoup
 import config

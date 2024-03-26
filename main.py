@@ -1,6 +1,5 @@
 import asyncio
 import logging
-import config
 from handlers import bot, dp, router, scheduled
 
 async def main():

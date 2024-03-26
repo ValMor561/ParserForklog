@@ -91,7 +91,7 @@ class ForkLog():
         soup = get_content(url)
         page = ""
         if config.HEADER != "":
-            page += "<b>" + config.HEADER + "</b>\n\n"
+            page += config.HEADER + "\n\n"
         page += "<b>" + self.get_title(soup) + "</b>"
         #Добавление хэштегов
         if config.HASHTAG == "on":
