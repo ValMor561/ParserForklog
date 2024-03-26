@@ -14,6 +14,8 @@ import datetime
 import pytz
 import os
 import sys
+from getcontent import get_content
+
 
 bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.HTML)
 dp = Dispatcher(storage=MemoryStorage())
@@ -49,7 +51,7 @@ async def scheduled():
             await asyncio.sleep(60)
 
 def save_current_time_to_file():
-    with open("/var/www/crypto/news_forklog/time.txt", 'w') as file:
+    with open("time.txt", 'w') as file:
         current_time = datetime.datetime.now().strftime("%H:%M:%S %Y-%m-%d")
         file.write(current_time)
 
@@ -65,9 +67,13 @@ async def check_urls():
     RUNNING = True
     #Обработка всех ссылок в конфиге
     for url in config.URL:
+        if "https://forklog.com" in url:
+            PM = parser_module.ForkLog()
+        elif "https://bits.media" in url:
+            pass
         #Получение ссылок из категории
-        soup = parser_module.get_content(url)
-        URLS = parser_module.get_href(soup)
+        soup = get_content(url)
+        URLS = PM.get_href(soup)
         for URL in URLS:
             if not RUNNING:
                 return False
@@ -75,7 +81,7 @@ async def check_urls():
             if BD.check_url_exist(URL):
                 continue
             #Получение текста
-            text = parser_module.get_page(URL)
+            text = PM.get_page(URL)
             BD.insert_url(URL)
             try:
                 #Отправка в канал
@@ -129,7 +135,7 @@ async def process_callback_stop(msg: Message):
 
 async def get_last_bot_message_time():
     res = "Время последнего сообщения: "
-    with open("/var/www/crypto/news_forklog/time.txt", 'r') as file:
+    with open("time.txt", 'r') as file:
         time_str = file.read().strip()
         res += time_str + "\n"
     return res
@@ -137,7 +143,7 @@ async def get_last_bot_message_time():
 #Текущее состояние
 @router.message(Command("stats"))
 async def process_callback_stop(msg: Message):
-    news_time = parser_module.get_time()
+    news_time = parser_module.get_title()
     post_time = await get_last_bot_message_time()
     await msg.answer(f"Бот запущен:\n{post_time}{news_time}")
 

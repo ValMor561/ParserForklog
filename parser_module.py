@@ -1,163 +1,129 @@
-import requests
-from bs4 import BeautifulSoup
 import re
 import config
-import random
-import bd
+from getcontent import get_content
 from datetime import datetime
 
+class ForkLog():
+    #Удаление парметров
+    def delete_param(self, url):
+        match = re.match(r'([^?]*)\?', url)
+        if match:
+            return match.group(1)
+        else:
+            return url
 
-def transform_to_http_format(input_string):
-    parts = input_string.split(":")
-    ip = parts[0]
-    port = parts[1]
-    login = parts[2] if len(parts) > 2 else ""
-    password = parts[3] if len(parts) > 3 else ""
+    #Получение всех ссылок с категории
+    def get_href(self, soup):
+        divs = soup.find_all(class_='post_item')
+        all_url = []
+        for div in divs:
+            url = div.find('a')
+            url = self.delete_param(url['href'])
+
+            date = div.find(class_='post_date').text
+            today = datetime.now().strftime("%d.%m.%Y")
+            if today == date:
+                all_url.append(url)
+        return all_url
+
+    #Получение названия поста
+    def get_title(self, soup):
+        if soup == -1:
+            return
+        
+        title = soup.title.string
+        return title
+
+    #Получение хэштегов
+    def get_tags(self, soup):
+        if soup == -1:
+            return
+        res = []
+
+        tags = soup.find(class_='post_tags_top').find_all('a')
+        for tag in tags:
+            res.append(tag.text.replace(" ", "_"))
+        return res
+
+    #Получение текста со страницы
+    def get_text(self, soup):
+        if soup == -1:
+            return
+        res = ""
+
+        paragraphs = soup.find(class_='post_content').find_all('p', class_=False, recursive=True)
+        for paragraph in paragraphs:
+            #Удаление цитат
+            if paragraph.find_parent(['blockquote']) is not None:
+                continue
+            #Удаление прочих лишних абзацев
+            if paragraph.find_parent(['div'])['class'][0] != 'post_content':
+                continue
+            paragraph_text = ''
+            for element in paragraph.contents:
+                #Удаление ссылок
+                if element.name == 'a':  
+                    paragraph_text += element.text  
+                elif isinstance(element, str):  
+                    paragraph_text += element 
+                elif element.name == 'span':
+                    if 'old_tooltip' in element.attrs['class']:
+                        paragraph_text += element.text
+
+            #Удаление пустых абзацев
+            if paragraph_text == "" or paragraph_text == ' ':
+                continue
+            res += paragraph_text + '\n\n'
+        return(res)
+
+    #Обработка длинны текста
+    def edit_text(self, text, maxlen = 1000):
+        text = text[0:maxlen]
+        if maxlen != 1000:
+            text += "...\n\n"
+            return text
+        #Удаление последнего неполного абзаца
+        text = re.sub(r'[^\n]*$', '', text)
+        return text
+
+    #Вызов всех функций и формирование сообщения
+    def get_page(self, url):
+        soup = get_content(url)
+        page = ""
+        if config.HEADER != "":
+            page += "<b>" + config.HEADER + "</b>\n\n"
+        page += "<b>" + self.get_title(soup) + "</b>"
+        #Добавление хэштегов
+        if config.HASHTAG == "on":
+            page += '\n' + ", ".join(self.get_tags(soup))
+        page += "\n\n" + self.edit_text(self.get_text(soup), config.TEXT_LENGTH)
+        #Добавление дополнительного текста
+        if config.TEXT != "":
+            if config.TEXT_URL == "":
+                page += config.TEXT + "\n"
+            else:
+                page += f'<a href="{config.TEXT_URL}">{config.TEXT}</a>' + "\n"    
+        return page
     
-    if login and password:
-        http_formatted_string = f"http://{login}:{password}@{ip}:{port}"
-    else:
-        http_formatted_string = f"http://{ip}:{port}"
+    def get_last_title(self, soup):
+        return soup.find(class_="text_blk").find('p').text
     
-    return http_formatted_string
 
-#Выбор случайного прокси
-def get_proxy():
-    proxy = random.choice(config.PROXY)   
-    https_proxy = transform_to_http_format(proxy)
-    proxies = {
-        'https': https_proxy
-    }
-    return proxies
 
-#Получение информации на странице
-def get_content(url):
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
-    count_try = 0
-    if config.PROXY[0] != "off":
-        #Перебор прокси если не получилось подключиться
-        while count_try != 3:
-            proxies = get_proxy()
-            try:
-                response = requests.get(url=url, headers=headers, proxies=proxies)
-                break
-            except requests.exceptions.ProxyError:
-                print("Прокси не подошла пробую другую")
-                count_try += 1
-    #Подключение без прокси
-    else:
-        response = requests.get(url, headers=headers)
-    #Если ни одна прокси не подошла
-    if count_try == 3:
-        response = requests.get(url, headers=headers)
 
-    if response.status_code == 200:
-        html_content = response.text
-        soup = BeautifulSoup(html_content, 'html.parser')
-        return soup
-    else:
-        return -1
+def choise_module(url):
+    if "https://forklog.com" in url:
+        return ForkLog()
+    elif "https://bits.media" in url:
+        return 
+
 
 #Получение времени последнего поста
-def get_time():
+def get_title():
     res = "Названия последних постов:\n"
     for url in config.URL:
+        PM = choise_module(url)
         soup = get_content(url)
-        time = soup.find(class_="text_blk").find('p').text
-        res += f'{url} - {time}\n'
+        title = PM.get_title(soup)
+        res += f'{url} - {title}\n'
     return res
-
-#Удаление парметров
-def delete_param(url):
-    match = re.match(r'([^?]*)\?', url)
-    if match:
-        return match.group(1)
-    else:
-        return url
-
-#Получение всех ссылок с категории
-def get_href(soup):
-    divs = soup.find_all(class_='post_item')
-    all_url = []
-    for div in divs:
-        url = div.find('a')
-        url = delete_param(url['href'])
-
-        date = div.find(class_='post_date').text
-        today = datetime.now().strftime("%d.%m.%Y")
-        if today == date:
-            all_url.append(url)
-    return all_url
-
-#Получение названия поста
-def get_title(soup):
-    if soup == -1:
-        return
-    
-    title = soup.title.string
-    return title
-
-#Получение хэштегов
-def get_tags(soup):
-    if soup == -1:
-        return
-    res = []
-
-    tags = soup.find(class_='post_tags_top').find_all('a')
-    for tag in tags:
-        res.append(tag.text.replace(" ", "_"))
-    return res
-
-#Получение текста со страницы
-def get_text(soup):
-    if soup == -1:
-        return
-    res = ""
-
-    paragraphs = soup.find(class_='post_content').find_all('p', class_=False, recursive=True)
-    for paragraph in paragraphs:
-        #Удаление цитат
-        if paragraph.find_parent(['blockquote']) is not None:
-            continue
-        #Удаление прочих лишних абзацев
-        if paragraph.find_parent(['div'])['class'][0] != 'post_content':
-            continue
-        paragraph_text = ''
-        for element in paragraph.contents:
-            #Удаление ссылок
-            if element.name == 'a':  
-                paragraph_text += element.text  
-            elif isinstance(element, str):  
-                paragraph_text += element 
-        #Удаление пустых абзацев
-        if paragraph_text == "" or paragraph_text == ' ':
-            continue
-        res += paragraph_text + '\n\n'
-    return(res)
-
-#Обработка длинны текста
-def edit_text(text, maxlen = 1000):
-    text = text[0:maxlen]
-    if maxlen != 1000:
-        text += "...\n\n"
-        return text
-    #Удаление последнего неполного абзаца
-    text = re.sub(r'[^\n]*$', '', text)
-    return text
-
-#Вызов всех функций и формирование сообщения
-def get_page(url):
-    soup = get_content(url)
-    page = ""
-    page += "<b>" + get_title(soup) + "</b>\n"
-    #Добавление хэштегов
-    if config.HASHTAG == "on":
-        page += ", ".join(get_tags(soup))
-    page += "\n\n" + edit_text(get_text(soup), config.TEXT_LENGTH)
-    #Добавление дополнительного текста
-    if config.TEXT != "":
-        if config.TEXT_URL == "":
-            page += config.TEXT + "\n"
-        else:
-            page += f'<a href="{config.TEXT_URL}">{config.TEXT}</a>' + "\n"    
-    return page
