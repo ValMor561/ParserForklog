@@ -2,6 +2,8 @@ import random
 import requests
 from bs4 import BeautifulSoup
 import config
+import pandas as pd
+import re
 
 def transform_to_http_format(input_string):
     parts = input_string.split(":")
@@ -53,3 +55,33 @@ def get_content(url):
         return soup
     else:
         return -1
+
+def replace_hashtag(tag):
+    if 'csv' in config.REPLACMENT:
+        replacements = pd.read_csv(config.REPLACMENT)
+    if 'xlsx' in config.REPLACMENT:
+        replacements = pd.read_excel(config.REPLACMENT)
+    replacements = replacements.fillna("")
+    replace_dict = dict(zip(replacements['Tag'], replacements['Replace']))
+    for key in replace_dict:
+        tag = tag.replace(key, replace_dict[key])
+    return tag
+
+#Обработка длинны текста
+def edit_text(text):
+    if config.TEXT_LENGTH != 1000:
+        text = text[0:config.TEXT_LENGTH]
+        text += "...\n\n"
+        return text
+    
+    if config.IMAGE == 'on':
+        maxlen = 1024 - len(config.TEXT) - len(config.TEXT_URL) - 40
+    else:
+        maxlen = 4096 - len(config.TEXT) - len(config.TEXT_URL) - 40
+
+    if len(text) > maxlen:
+        text = text[0:maxlen]
+        text = re.sub(r'[^\n]*$', '', text)
+    return text
+
+    

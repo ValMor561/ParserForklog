@@ -11,7 +11,7 @@ def get_config(filename):
 #На вход подается значение хранящееся в конфиге
 def get_multiple_values(param):
     if ".txt" in param:
-        with open(param, 'r') as file:
+        with open(param, encoding = 'utf-8', mode = 'r') as file:
             lines = file.readlines()
             lines = [line.strip() for line in lines]
             return lines
@@ -30,8 +30,11 @@ WORK_START_TIME = config['SETTINGS']['work_start_time']
 WORK_END_RIME = config['SETTINGS']['work_end_time']
 WORK_TIME = config['SETTINGS']['work_time'].split(',')
 WORK_PERIOD = config['SETTINGS']['work_period']
+REPLACMENT = config['SETTINGS']['replacement']
+EXCLUDE = get_multiple_values(config['SETTINGS']['exclude'])
 URL = get_multiple_values(config['MESSAGE']['URL'])
 HASHTAG = config['MESSAGE']['hashtag']
+IMAGE = config['MESSAGE']['image']
 TEXT = config['MESSAGE']['text']
 TEXT_URL = config['MESSAGE']['text_url']
 TEXT_LENGTH = 1000 if config['MESSAGE']['text_length'] == '*' else int(config['MESSAGE']['text_length'])

@@ -6,7 +6,9 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.exceptions import TelegramRetryAfter
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 import asyncio
-import parser_module
+from parser_module import get_title
+from forklog import ForkLog
+from bitmedia import BitMedia
 import config
 import bd
 from time import sleep
@@ -14,7 +16,6 @@ import datetime
 import pytz
 import os
 import sys
-from getcontent import get_content
 
 
 bot = Bot(token=config.BOT_TOKEN, parse_mode=ParseMode.HTML)
@@ -22,12 +23,14 @@ dp = Dispatcher(storage=MemoryStorage())
 router = Router()
 BD = bd.BDRequests()
 RUNNING = True
+IS_ERROR = False
 
 #Функия для запуска парсинга с проверкой по времени
 async def run_bot():
     now = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
     all_week_days = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
     current_day = now.weekday()
+    global IS_ERROR
 
     if all_week_days[current_day] in config.WORK_DAYS:
         current_time = now.strftime("%H:%M")
@@ -35,12 +38,21 @@ async def run_bot():
             #Если включен параметр work_time сравниваем с текущим временем иначе просто запускаем
             if config.WORK_TIME != "off":
                 if current_time in config.WORK_TIME:
-                    await check_urls()
+                    try:
+                        await check_urls()
+                    except Exception as e:
+                        print(e)
+                        IS_ERROR = True
                     return
             #Запускаем парсинг только в случае периодического запуска
             if config.WORK_PERIOD != "off":
-                await check_urls()
-
+                try:  
+                    await check_urls()
+                except Exception as e:
+                    print(e)
+                    IS_ERROR
+                    IS_ERROR = True
+                
 #Бесконечный цикл с запуском функции парсинга каждую минуту либо через определенный период
 async def scheduled():
     while True:
@@ -68,12 +80,11 @@ async def check_urls():
     #Обработка всех ссылок в конфиге
     for url in config.URL:
         if "https://forklog.com" in url:
-            PM = parser_module.ForkLog()
+            PM = ForkLog()
         elif "https://bits.media" in url:
-            pass
+            PM = BitMedia()
         #Получение ссылок из категории
-        soup = get_content(url)
-        URLS = PM.get_href(soup)
+        URLS = PM.get_href(url)
         for URL in URLS:
             if not RUNNING:
                 return False
@@ -83,27 +94,44 @@ async def check_urls():
             #Получение текста
             text = PM.get_page(URL)
             BD.insert_url(URL)
+            
+            if text == -1:
+                continue    
+
             try:
                 #Отправка в канал
                 channels_id = config.CHANELLS_ID
                 for channel in channels_id:
-                    await bot.send_message(text=text, parse_mode='html', chat_id=channel)
+                    if config.IMAGE == 'on':
+                        image_url = PM.get_image(URL)
+                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                    else:
+                        await bot.send_message(text=text, parse_mode='html', chat_id=channel)
             #В случае превышения лимита телеграма подождать указаное время
             except TelegramRetryAfter as e:
                 sleep(e.retry_after)
                 channels_id = config.CHANELLS_ID
                 for channel in channels_id:
-                    await bot.send_message(text=text, parse_mode='html', chat_id=channel)
+                    if config.IMAGE == 'on':
+                        image_url = PM.get_image(URL)
+                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                    else:
+                        await bot.send_message(text=text, parse_mode='html', chat_id=channel)
             save_current_time_to_file()
-        return True
+    return True
     
 #Функция парсинга запускается командой post либо по расписанию функцией run_bot
 @router.message(Command("post"))
 async def start_handler(msg: Message):
+    global IS_ERROR
     await msg.answer("Начат обход ссылок")
-    if await check_urls():
-        await msg.answer("Все ссылки проверены")
-        
+    try:
+        if await check_urls():
+            await msg.answer("Все ссылки проверены")
+    except Exception as e:
+        print(e)
+        await msg.answer("В процессе работы возникли ошибки, для перезапуска /restart")
+        IS_ERROR = True     
 
 #Запуск бота и вход в режим бесконечного цикла
 @router.message(Command("start"))
@@ -143,9 +171,13 @@ async def get_last_bot_message_time():
 #Текущее состояние
 @router.message(Command("stats"))
 async def process_callback_stop(msg: Message):
-    news_time = parser_module.get_title()
+    news_time = get_title()
     post_time = await get_last_bot_message_time()
-    await msg.answer(f"Бот запущен:\n{post_time}{news_time}")
+    global IS_ERROR
+    if IS_ERROR:
+        await msg.answer(f"Возникли ошибки для перезапуска выполните /restart:\n{post_time}{news_time}")
+    else:
+        await msg.answer(f"Бот работает:\n{post_time}{news_time}")
 
 #Перезапуск бота
 @router.message(Command("restart"))
