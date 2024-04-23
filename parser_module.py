@@ -11,6 +11,7 @@ def choise_module(url):
         return BitMedia()
     elif "https://www.coindesk.com" in url:
         return CoinDesk()
+    
 #Получение времени последнего поста
 def get_title():
     res = "Названия последних постов:\n"

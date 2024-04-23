@@ -15,7 +15,7 @@ class CoinDesk():
     #Получение всех ссылок с категории
     def get_href(self, url):
         soup = get_content(url)
-        divs = soup.find_all(class_='hKtOz')
+        divs = soup.find_all(class_='side-cover-card')
         all_url = []
         for div in divs:
             url = div.find('a')

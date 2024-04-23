@@ -85,7 +85,7 @@ async def check_urls():
         elif "https://bits.media" in url:
             PM = BitMedia()
         elif "https://www.coindesk.com" in url:
-            PN = CoinDesk()
+            PM = CoinDesk()
         #Получение ссылок из категории
         URLS = PM.get_href(url)
         for URL in URLS:
@@ -95,7 +95,7 @@ async def check_urls():
             if BD.check_url_exist(URL):
                 continue
             #Получение текста
-            text = await PM.get_page(URL)
+            text = PM.get_page(URL)
             BD.insert_url(URL)
             
             if text == -1:
