@@ -1,6 +1,7 @@
 import random
 import requests
 from bs4 import BeautifulSoup
+from deep_translator import GoogleTranslator
 import config
 import pandas as pd
 import re
@@ -48,7 +49,7 @@ def get_content(url):
     #Если ни одна прокси не подошла
     if count_try == 3:
         response = requests.get(url, headers=headers)
-
+        
     if response.status_code == 200:
         html_content = response.text
         soup = BeautifulSoup(html_content, 'html.parser')
@@ -84,4 +85,8 @@ def edit_text(text):
         text = re.sub(r'[^\n]*$', '', text)
     return text
 
-    
+def translate_text(text):
+    if len(text) > 4900:
+        text = text[0:4900]
+        text = re.sub(r'[^\n]*$', '', text)
+    return GoogleTranslator(source='en', target='ru').translate(text)

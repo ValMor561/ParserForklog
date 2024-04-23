@@ -3,12 +3,13 @@ from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.enums.parse_mode import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.exceptions import TelegramRetryAfter
+from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 import asyncio
 from parser_module import get_title
 from forklog import ForkLog
 from bitmedia import BitMedia
+from coindesk import CoinDesk
 import config
 import bd
 from time import sleep
@@ -83,6 +84,8 @@ async def check_urls():
             PM = ForkLog()
         elif "https://bits.media" in url:
             PM = BitMedia()
+        elif "https://www.coindesk.com" in url:
+            PN = CoinDesk()
         #Получение ссылок из категории
         URLS = PM.get_href(url)
         for URL in URLS:
@@ -92,7 +95,7 @@ async def check_urls():
             if BD.check_url_exist(URL):
                 continue
             #Получение текста
-            text = PM.get_page(URL)
+            text = await PM.get_page(URL)
             BD.insert_url(URL)
             
             if text == -1:
@@ -104,9 +107,15 @@ async def check_urls():
                 for channel in channels_id:
                     if config.IMAGE == 'on':
                         image_url = PM.get_image(URL)
-                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                        try:
+                            await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                        except TelegramBadRequest as e:
+                            continue
                     else:
-                        await bot.send_message(text=text, parse_mode='html', chat_id=channel)
+                        try:
+                            await bot.send_message(text=text, parse_mode='html', chat_id=channel)
+                        except TelegramBadRequest as e:
+                            continue
             #В случае превышения лимита телеграма подождать указаное время
             except TelegramRetryAfter as e:
                 sleep(e.retry_after)
@@ -114,9 +123,15 @@ async def check_urls():
                 for channel in channels_id:
                     if config.IMAGE == 'on':
                         image_url = PM.get_image(URL)
-                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                        try:
+                            await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                        except TelegramBadRequest as e:
+                            continue
                     else:
-                        await bot.send_message(text=text, parse_mode='html', chat_id=channel)
+                        try:
+                            await bot.send_message(text=text, parse_mode='html', chat_id=channel)
+                        except TelegramBadRequest as e:
+                            continue
             save_current_time_to_file()
     return True
     
