@@ -3,8 +3,9 @@ from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.enums.parse_mode import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest
+from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest, TelegramNetworkError
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import asyncio
 from parser_module import get_title
 from forklog import ForkLog
@@ -12,7 +13,6 @@ from bitmedia import BitMedia
 from coindesk import CoinDesk
 import config
 import bd
-from time import sleep
 import datetime
 import pytz
 import os
@@ -26,42 +26,35 @@ BD = bd.BDRequests()
 RUNNING = True
 IS_ERROR = False
 
+
 #Функия для запуска парсинга с проверкой по времени
 async def run_bot():
     now = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
     all_week_days = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
     current_day = now.weekday()
     global IS_ERROR
-
+    if os.path.exists("restart.txt"):
+        with open("restart.txt", 'r') as file:
+            id = file.read().strip()
+            await bot.send_message(id, "Бот запущен")
+        os.remove("restart.txt")
+    SCHEDULER = AsyncIOScheduler(timezone='Europe/Moscow')
     if all_week_days[current_day] in config.WORK_DAYS:
-        current_time = now.strftime("%H:%M")
-        if config.WORK_START_TIME <= current_time <= config.WORK_END_RIME:
-            #Если включен параметр work_time сравниваем с текущим временем иначе просто запускаем
-            if config.WORK_TIME != "off":
-                if current_time in config.WORK_TIME:
-                    try:
-                        await check_urls()
-                    except Exception as e:
-                        print(e)
-                        IS_ERROR = True
-                    return
-            #Запускаем парсинг только в случае периодического запуска
-            if config.WORK_PERIOD != "off":
-                try:  
-                    await check_urls()
+        if config.WORK_PERIOD != "off":
+            try:
+                SCHEDULER.add_job(check_urls, trigger='interval', minutes=config.WORK_PERIOD)
+                SCHEDULER.add_job(check_urls, trigger='date', next_run_time=datetime.datetime.now() + datetime.timedelta(seconds=10))
+            except Exception as e:
+                print(e)
+                IS_ERROR = True
+        if config.WORK_TIME[0] != "off":
+            for time in config.WORK_TIME:
+                try:
+                    SCHEDULER.add_job(check_urls, trigger='date', next_run_time=time)
                 except Exception as e:
                     print(e)
-                    IS_ERROR
-                    IS_ERROR = True
-                
-#Бесконечный цикл с запуском функции парсинга каждую минуту либо через определенный период
-async def scheduled():
-    while True:
-        await run_bot()
-        if config.WORK_PERIOD != "off":
-            await asyncio.sleep(int(config.WORK_PERIOD)*60)
-        else:
-            await asyncio.sleep(60)
+                    IS_ERROR = True            
+    SCHEDULER.start()
 
 def save_current_time_to_file():
     with open("time.txt", 'w') as file:
@@ -75,6 +68,10 @@ async def check_user_id(msg: Message):
     return
 
 async def check_urls():
+    now = datetime.datetime.now(pytz.timezone('Europe/Moscow'))
+    current_time = now.strftime("%H:%M")
+    if not (config.WORK_START_TIME <= current_time <= config.WORK_END_RIME):
+        return
     #Переменная для остановки
     global RUNNING
     RUNNING = True
@@ -96,42 +93,50 @@ async def check_urls():
                 continue
             #Получение текста
             text = PM.get_page(URL)
+            if config.IMAGE == 'on':
+                image_url = PM.get_image(URL)
             BD.insert_url(URL)
             
             if text == -1:
                 continue    
-
-            try:
-                #Отправка в канал
-                channels_id = config.CHANELLS_ID
-                for channel in channels_id:
-                    if config.IMAGE == 'on':
-                        image_url = PM.get_image(URL)
-                        try:
-                            await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
-                        except TelegramBadRequest as e:
-                            continue
-                    else:
-                        try:
-                            await bot.send_message(text=text, parse_mode='html', chat_id=channel)
-                        except TelegramBadRequest as e:
-                            continue
-            #В случае превышения лимита телеграма подождать указаное время
-            except TelegramRetryAfter as e:
-                sleep(e.retry_after)
-                channels_id = config.CHANELLS_ID
-                for channel in channels_id:
-                    if config.IMAGE == 'on':
-                        image_url = PM.get_image(URL)
-                        try:
-                            await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
-                        except TelegramBadRequest as e:
-                            continue
-                    else:
-                        try:
-                            await bot.send_message(text=text, parse_mode='html', chat_id=channel)
-                        except TelegramBadRequest as e:
-                            continue
+            
+            #Отправка в канал
+            channels_id = config.CHANELLS_ID
+            count = 0
+            for channel in channels_id:
+                if count == 15:
+                    await asyncio.sleep(5)
+                if config.IMAGE == 'on':
+                    image_url = PM.get_image(URL)
+                    try:
+                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                        count += 1
+                    except TelegramBadRequest as e:
+                        print(e)
+                        continue
+                    except TelegramRetryAfter as e:
+                        count = 0
+                        await asyncio.sleep(e.retry_after)
+                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                    except TelegramNetworkError as e:
+                        count = 0
+                        await asyncio.sleep(15)
+                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                else:
+                    try:
+                        await bot.send_message(text=text, parse_mode='html', chat_id=channel)
+                        count += 1
+                    except TelegramBadRequest as e:
+                        print(e)
+                        continue
+                    except TelegramRetryAfter as e:
+                        count = 0
+                        await asyncio.sleep(e.retry_after)
+                        await bot.send_message(text=text, parse_mode='html', chat_id=channel)
+                    except TelegramNetworkError as e:
+                        count = 0
+                        await asyncio.sleep(15)
+                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
             save_current_time_to_file()
     return True
     
@@ -157,7 +162,7 @@ async def cmd_start(msg: Message):
     builder = ReplyKeyboardBuilder()
     builder.row(types.KeyboardButton(text='/post', callback_data='post'), types.KeyboardButton(text='/stop', callback_data='stop'))
     builder.row(types.KeyboardButton(text='/clean_bd', callback_data='clean_bd'), types.KeyboardButton(text='/restart', callback_data='restart'))
-    builder.row(types.KeyboardButton(text='/stats', callback_data='stats'))
+    builder.row(types.KeyboardButton(text='/stats', callback_data='stats'), types.KeyboardButton(text='/start', callback_data='start'))
 
     keyboard = builder.as_markup(resize_keyboard=True)
     await msg.answer("Бот запущен\nКоманды:\n/post - Единоразовый запуск парсера\n/clean_bd - Очистка базы данных с посещенными ссылками\n/restart - Перезапуск всего бота\n/stop - Остановка функции парсинга\n/stats - Состояние бота", reply_markup=keyboard)
@@ -198,6 +203,8 @@ async def process_callback_stop(msg: Message):
 @router.message(Command("restart"))
 async def restart(msg: Message):
     await msg.answer("Перезапуск бота...\n")
+    with open("restart.txt", 'w') as file:
+        file.write(str(msg.from_user.id))
     python = sys.executable
     os.execl(python, python, *sys.argv)
 

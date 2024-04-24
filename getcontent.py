@@ -1,10 +1,12 @@
 import random
 import requests
+from requests.exceptions import ConnectionError 
 from bs4 import BeautifulSoup
 from deep_translator import GoogleTranslator
 import config
 import pandas as pd
 import re
+from fake_useragent import UserAgent
 
 def transform_to_http_format(input_string):
     parts = input_string.split(":")
@@ -25,13 +27,15 @@ def get_proxy():
     proxy = random.choice(config.PROXY)   
     https_proxy = transform_to_http_format(proxy)
     proxies = {
+        'http' : https_proxy,
         'https': https_proxy
     }
     return proxies
 
 #Получение информации на странице
 def get_content(url):
-    headers = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/50.0.2661.102 Safari/537.36'}
+    user_agent = UserAgent().random.strip()
+    headers = {'User-Agent': user_agent}
     count_try = 0
     if config.PROXY[0] != "off":
         #Перебор прокси если не получилось подключиться
@@ -43,13 +47,13 @@ def get_content(url):
             except requests.exceptions.ProxyError:
                 print("Прокси не подошла пробую другую")
                 count_try += 1
-    #Подключение без прокси
+            except ConnectionError as e:
+                count_try += 1
+        if count_try == 3:
+            response = requests.get(url, headers=headers)
     else:
         response = requests.get(url, headers=headers)
-    #Если ни одна прокси не подошла
-    if count_try == 3:
-        response = requests.get(url, headers=headers)
-        
+            
     if response.status_code == 200:
         html_content = response.text
         soup = BeautifulSoup(html_content, 'html.parser')
@@ -90,3 +94,5 @@ def translate_text(text):
         text = text[0:4900]
         text = re.sub(r'[^\n]*$', '', text)
     return GoogleTranslator(source='en', target='ru').translate(text)
+
+get_content("https://www.coindesk.com/tag/first-mover/1/")

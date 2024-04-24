@@ -20,8 +20,6 @@ class BitMedia():
     #Получение всех ссылок с категории
     def get_href(self, url):
         soup = get_content(url)
-        if soup == -1:
-            return -1
         divs = soup.find_all(class_='news-item')
         all_url = []
         for div in divs:
