@@ -86,13 +86,11 @@ def edit_text(text):
 
     if len(text) > maxlen:
         text = text[0:maxlen]
-        text = re.sub(r'[^\n]*$', '', text)
+        text = re.sub(r'[^.]*$', '', text)
     return text
 
 def translate_text(text):
     if len(text) > 4900:
         text = text[0:4900]
-        text = re.sub(r'[^\n]*$', '', text)
+        text = re.sub(r'[^.]*$', '', text)
     return GoogleTranslator(source='en', target='ru').translate(text)
-
-get_content("https://www.coindesk.com/tag/first-mover/1/")

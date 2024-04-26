@@ -37,7 +37,7 @@ class CoinDesk():
     
     def get_image(self, url):
         soup = get_content(url)
-        img_link = soup.find(attrs={"data-module-name": "article-header"}).find('picture').find('img').attrs['src']
+        img_link = soup.find(class_="ftMzOf").find('picture').find('img').attrs['src']
         return img_link
 
     #Получение хэштегов
@@ -68,13 +68,13 @@ class CoinDesk():
         if soup == -1:
             return
         res = ""
-        res += soup.find(attrs={"data-module-name": "article-header"}).find('h2').text
+        res += soup.find(attrs={"data-module-name": "article-header"}).find('h2').text + "\n"
         paragraphs = soup.find(attrs={"data-module-name": "article-body"}).find_all('p', class_=False, recursive=True)
         for paragraph in paragraphs:
             #Удаление цитат
             if paragraph.find_parent(['blockquote']) is not None:
                 continue
-            if 'read more' in paragraph.text.lower():
+            if 'read more' in paragraph.text.lower() or 'see also' in paragraph.text.lower() or 'newsletter here' in paragraph.text.lower():
                 continue
             paragraph_text = ''
             for element in paragraph.contents:
