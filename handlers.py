@@ -3,7 +3,7 @@ from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.enums.parse_mode import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
-from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest, TelegramNetworkError
+from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest, TelegramNetworkError, TelegramForbiddenError
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 import asyncio
@@ -62,7 +62,7 @@ def save_current_time_to_file():
         file.write(current_time)
 
 #Ограничение доступа пользователям, которых нет в списке
-@router.message(lambda message:str(message.from_user.id) not in config.ADMINS)
+@router.message(lambda message:str(message.chat.id) not in config.ADMINS)
 async def check_user_id(msg: Message):
     await msg.answer("Нет доступа")
     return
@@ -74,6 +74,7 @@ async def check_urls():
         return
     #Переменная для остановки
     global RUNNING
+    global IS_ERROR
     RUNNING = True
     #Обработка всех ссылок в конфиге
     for url in config.URL:
@@ -111,9 +112,6 @@ async def check_urls():
                     try:
                         await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
                         count += 1
-                    except TelegramBadRequest as e:
-                        print(e)
-                        continue
                     except TelegramRetryAfter as e:
                         count = 0
                         await asyncio.sleep(e.retry_after)
@@ -122,13 +120,14 @@ async def check_urls():
                         count = 0
                         await asyncio.sleep(15)
                         await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                    except Exception as e:
+                        print(e)
+                        IS_ERROR = True
+                        continue
                 else:
                     try:
                         await bot.send_message(text=text, parse_mode='html', chat_id=channel)
                         count += 1
-                    except TelegramBadRequest as e:
-                        print(e)
-                        continue
                     except TelegramRetryAfter as e:
                         count = 0
                         await asyncio.sleep(e.retry_after)
@@ -137,6 +136,10 @@ async def check_urls():
                         count = 0
                         await asyncio.sleep(15)
                         await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                    except Exception as e:
+                        print(e)
+                        IS_ERROR = True
+                        continue
             save_current_time_to_file()
     return True
     

@@ -22,8 +22,9 @@ class CoinDesk():
             url = self.delete_param(url['href'])
             
             date = div.find(class_='eeyqKG').find('span').text
-            today = datetime.today().strftime('%B %d, %Y')
-            if today == date:
+            date = datetime.strptime(date, '%B %d, %Y')
+            today = datetime.today()
+            if today.day == date.day and today.month == date.month:
                 all_url.append(f"https://www.coindesk.com{url}")
         return all_url
 
@@ -122,4 +123,3 @@ class CoinDesk():
     
     def get_last_title(self, soup):
         return soup.find(class_="side-cover-card").find('h4').text
-
