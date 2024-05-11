@@ -1,4 +1,4 @@
-from aiogram import types,  Router, Bot, Dispatcher
+from aiogram import types,  Router, Bot, Dispatcher, F
 from aiogram.types import Message
 from aiogram.filters import Command
 from aiogram.enums.parse_mode import ParseMode
@@ -62,7 +62,7 @@ def save_current_time_to_file():
         file.write(current_time)
 
 #Ограничение доступа пользователям, которых нет в списке
-@router.message(lambda message:str(message.chat.id) not in config.ADMINS)
+@router.message(lambda message:str(message.from_user.id) not in config.ADMINS, F.chat.type == 'private')
 async def check_user_id(msg: Message):
     await msg.answer("Нет доступа")
     return
@@ -78,11 +78,11 @@ async def check_urls():
     RUNNING = True
     #Обработка всех ссылок в конфиге
     for url in config.URL:
-        if "https://forklog.com" in url:
+        if "forklog" in url:
             PM = ForkLog()
-        elif "https://bits.media" in url:
+        elif "bits.media" in url:
             PM = BitMedia()
-        elif "https://www.coindesk.com" in url:
+        elif "coindesk" in url:
             PM = CoinDesk()
         #Получение ссылок из категории
         URLS = PM.get_href(url)
@@ -122,7 +122,6 @@ async def check_urls():
                         await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
                     except Exception as e:
                         print(e)
-                        IS_ERROR = True
                         continue
                 else:
                     try:
@@ -138,7 +137,6 @@ async def check_urls():
                         await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
                     except Exception as e:
                         print(e)
-                        IS_ERROR = True
                         continue
             save_current_time_to_file()
     return True

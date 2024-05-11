@@ -5,11 +5,11 @@ from bitmedia import BitMedia
 from coindesk import CoinDesk
 
 def choise_module(url):
-    if "https://forklog.com" in url:
+    if "forklog" in url:
         return ForkLog()
-    elif "https://bits.media" in url:
+    elif "bits.media" in url:
         return BitMedia()
-    elif "https://www.coindesk.com" in url:
+    elif "coindesk" in url:
         return CoinDesk()
     
 #Получение времени последнего поста
