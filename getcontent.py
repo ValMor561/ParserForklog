@@ -94,3 +94,8 @@ def translate_text(text):
         text = text[0:4900]
         text = re.sub(r'[^.]*$', '', text)
     return GoogleTranslator(source='en', target='ru').translate(text)
+
+def get_first_paragrapth(text):
+    paragraphs = text.split('\n')
+    return paragraphs[0]
+

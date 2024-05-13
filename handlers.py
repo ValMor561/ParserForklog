@@ -6,8 +6,10 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.exceptions import TelegramRetryAfter, TelegramBadRequest, TelegramNetworkError, TelegramForbiddenError
 from aiogram.utils.keyboard import ReplyKeyboardBuilder
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from aiogram.types import FSInputFile
 import asyncio
 from parser_module import get_title
+from generate import generate_image_by_first_p, generate_image_by_title
 from forklog import ForkLog
 from bitmedia import BitMedia
 from coindesk import CoinDesk
@@ -25,7 +27,6 @@ router = Router()
 BD = bd.BDRequests()
 RUNNING = True
 IS_ERROR = False
-
 
 #Функия для запуска парсинга с проверкой по времени
 async def run_bot():
@@ -92,14 +93,33 @@ async def check_urls():
             #Отсев дублей
             if BD.check_url_exist(URL):
                 continue
+
             #Получение текста
-            text = PM.get_page(URL)
-            if config.IMAGE == 'on':
-                image_url = PM.get_image(URL)
-            BD.insert_url(URL)
+            dict = PM.get_page(URL)
+            if dict == -1:
+                continue  
             
-            if text == -1:
-                continue    
+            text = dict['page']
+            if config.IMAGE == 'on':
+                if config.GENERATE_IMAGE == 'on':
+                    title = dict['title']
+                    first_p = dict['first_p']
+                    try:
+                        success = await generate_image_by_first_p(first_p)
+                        if success:
+                            photo = FSInputFile("images/image.jpg")
+                        else: 
+                            success = await generate_image_by_title(title)
+                            if success:
+                                photo = FSInputFile("images/image.jpg")
+                            else: 
+                                photo = PM.get_image(URL)
+                    except Exception as e:
+                        print(str(e))
+                        photo = PM.get_image(URL)
+                else:
+                    photo = PM.get_image(URL)
+            BD.insert_url(URL)
             
             #Отправка в канал
             channels_id = config.CHANELLS_ID
@@ -108,18 +128,17 @@ async def check_urls():
                 if count == 15:
                     await asyncio.sleep(5)
                 if config.IMAGE == 'on':
-                    image_url = PM.get_image(URL)
                     try:
-                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                        await bot.send_photo(channel, photo, parse_mode='html', caption=text)
                         count += 1
                     except TelegramRetryAfter as e:
                         count = 0
                         await asyncio.sleep(e.retry_after)
-                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                        await bot.send_photo(channel, photo, parse_mode='html', caption=text)
                     except TelegramNetworkError as e:
                         count = 0
                         await asyncio.sleep(15)
-                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                        await bot.send_photo(channel, photo, parse_mode='html', caption=text)
                     except Exception as e:
                         print(e)
                         continue
@@ -134,7 +153,7 @@ async def check_urls():
                     except TelegramNetworkError as e:
                         count = 0
                         await asyncio.sleep(15)
-                        await bot.send_photo(channel, image_url, parse_mode='html', caption=text)
+                        await bot.send_message(text=text, parse_mode='html', chat_id=channel)
                     except Exception as e:
                         print(e)
                         continue

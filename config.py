@@ -18,7 +18,7 @@ def get_multiple_values(param):
     return param.replace(" ", "").split(',')
 
 all_week_days = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
-config = get_config('config.ini')
+config = get_config('config2.ini')
 
 #Глобальные переменные всех параметров
 BOT_TOKEN = config['DEFAULT']['bot_token']
@@ -35,12 +35,16 @@ EXCLUDE = get_multiple_values(config['SETTINGS']['exclude'])
 URL = get_multiple_values(config['MESSAGE']['URL'])
 HASHTAG = config['MESSAGE']['hashtag']
 IMAGE = config['MESSAGE']['image']
+GENERATE_IMAGE = config['MESSAGE']['generate_image']
 TEXT = config['MESSAGE']['text']
 TEXT_URL = config['MESSAGE']['text_url']
 TEXT_LENGTH = 1000 if config['MESSAGE']['text_length'] == '*' else int(config['MESSAGE']['text_length'])
 HEADER = config['MESSAGE']['header']
-HOST=config['BD']['host']
-DATABASE=config['BD']['database']
-USER=config['BD']['user']
-PASSWORD=config['BD']['password']
-TABLENAME=config['BD']['tablename']
+HOST = config['BD']['host']
+DATABASE = config['BD']['database']
+USER = config['BD']['user']
+PASSWORD = config['BD']['password']
+TABLENAME = config['BD']['tablename']
+BRAIN_API_KEY = config['BRAINFUSION']['api_key']
+BRAIN_SECRET_KEY = config['BRAINFUSION']['secret_key']
+STYLE = config['BRAINFUSION']['style']

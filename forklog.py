@@ -1,6 +1,6 @@
 import re
 import config
-from getcontent import get_content, replace_hashtag, edit_text
+from getcontent import get_content, replace_hashtag, edit_text, get_first_paragrapth
 from datetime import datetime
 
 class ForkLog():
@@ -92,26 +92,32 @@ class ForkLog():
 
     #Вызов всех функций и формирование сообщения
     def get_page(self, url):
+        res = {}
         soup = get_content(url)
         page = ""
         if config.HEADER != "":
             page += config.HEADER + "\n\n"
-        page += "<b>" + self.get_title(soup) + "</b>"
+        title = self.get_title(soup)
+        res ['title'] = title
+        page += "<b>" + title + "</b>"
         #Добавление хэштегов
         if config.HASHTAG == "on":
             tags = self.get_tags(soup)
             if tags == -1:
                 return -1
             page += '\n' + ", ".join(tags)
-        page += "\n\n" + self.get_text(soup)
+        text = self.get_text(soup)
+        res['first_p'] = get_first_paragrapth(text)
+        page += "\n\n" + text
         page = edit_text(page)
         #Добавление дополнительного текста
         if config.TEXT != "":
             if config.TEXT_URL == "":
                 page += config.TEXT + "\n"
             else:
-                page += f'<a href="{config.TEXT_URL}">{config.TEXT}</a>' + "\n"    
-        return page
+                page += f'<a href="{config.TEXT_URL}">{config.TEXT}</a>' + "\n"
+        res['page'] = page
+        return res
     
     def get_last_title(self, soup):
         return soup.find(class_="text_blk").find('p').text
