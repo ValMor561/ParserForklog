@@ -80,9 +80,9 @@ def edit_text(text):
         return text
     
     if config.IMAGE == 'on':
-        maxlen = 1024 - len(config.TEXT) - len(config.TEXT_URL) - 40
+        maxlen = 1024 - len(config.FIRST_TEXT) - len(config.FIRST_TEXT_URL) - 40
     else:
-        maxlen = 4096 - len(config.TEXT) - len(config.TEXT_URL) - 40
+        maxlen = 4096 - len(config.SECOND_TEXT) - len(config.SECOND_TEXT_URL) - 40
 
     if len(text) > maxlen:
         text = text[0:maxlen]

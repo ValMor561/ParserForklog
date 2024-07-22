@@ -51,9 +51,15 @@ class CoinDesk():
         if tags:
             tags = tags.find_all('a')
         else:
+            if config.SOURCE_TAG == "on":
+                res.append("#Coindesk")
             return res
+        include = False
         for tag in tags:
             tag_text = tag.find('span').text.replace('#', '').strip()
+            if config.INCLUDE == "on":
+                if tag_text in config.INCLUDE_LIST:
+                    include = True
             if config.EXCLUDE != "off":
                 if tag_text in config.EXCLUDE:
                     return -1
@@ -61,7 +67,10 @@ class CoinDesk():
                 tag = replace_hashtag(tag_text)
                 if tag != '':
                     res.append("#" + tag.replace(" ", "_"))
-            
+        if config.SOURCE_TAG == "on":
+            res.append("#Coindesk")
+        if config.INCLUDE == "on" and not include:
+            return -1 
         return res
 
     #Получение текста со страницы
@@ -69,13 +78,13 @@ class CoinDesk():
         if soup == -1:
             return
         res = ""
-        res += soup.find(attrs={"data-module-name": "article-header"}).find('h2').text + "\n"
+        res += soup.find(attrs={"data-module-name": "article-header"}).find('h2').text + "\n\n"
         paragraphs = soup.find(attrs={"data-module-name": "article-body"}).find_all('p', class_=False, recursive=True)
         for paragraph in paragraphs:
             #Удаление цитат
             if paragraph.find_parent(['blockquote']) is not None:
                 continue
-            if 'read more' in paragraph.text.lower() or 'see also' in paragraph.text.lower() or 'newsletter here' in paragraph.text.lower():
+            if 'read more' in paragraph.text.lower() or 'see also' in paragraph.text.lower() or 'newsletter here' in paragraph.text.lower() or "first mover" in paragraph.text.lower():
                 continue
             paragraph_text = ''
             for element in paragraph.contents:
@@ -117,13 +126,18 @@ class CoinDesk():
         text = self.get_text(soup)
         res['first_p'] = get_first_paragrapth(text)
         page += "\n\n" + text
-        page = edit_text(page)
+        page = edit_text(page) + "\n"
         #Добавление дополнительного текста
-        if config.TEXT != "":
-            if config.TEXT_URL == "":
-                page += config.TEXT + "\n"
+        if config.FIRST_TEXT != "":
+            if config.FIRST_TEXT_URL == "":
+                page += "\n<b>" + config.FIRST_TEXT + "</b>\n"
             else:
-                page += f'<a href="{config.TEXT_URL}">{config.TEXT}</a>' + "\n"
+                page += f'\n<b><a href="{config.FIRST_TEXT_URL}">{config.FIRST_TEXT}</a></b>\n'
+        if config.SECOND_TEXT != "":
+            if config.SECOND_TEXT_URL == "":
+                page += "\n" + config.SECOND_TEXT + "\n"
+            else:
+                page += f'\n<a href="{config.SECOND_TEXT_URL}">{config.SECOND_TEXT}</a>' + "\n"
         res['page'] = page 
         return res
     

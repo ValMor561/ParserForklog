@@ -59,8 +59,12 @@ class BitMedia():
         res = []
 
         tags = soup.find(class_='news-tags').find_all('a')
+        include = False
         for tag in tags:
             tag = tag.text.strip(" ")
+            if config.INCLUDE == "on":
+                if tag in config.INCLUDE_LIST:
+                    include = True
             if config.EXCLUDE != "off":
                 if tag in config.EXCLUDE:
                     return -1
@@ -68,6 +72,10 @@ class BitMedia():
                 tag = replace_hashtag(tag)
             if tag != '':
                 res.append('#' + tag.replace(" ", "_"))
+        if config.SOURCE_TAG == "on":
+            res.append("#Bitmedia")
+        if config.INCLUDE == "on" and not include:
+            return -1 
         return res
 
     #Получение текста со страницы
@@ -129,13 +137,18 @@ class BitMedia():
         text = self.get_text(soup)
         res['first_p'] = get_first_paragrapth(text)
         page += "\n\n" + text
-        page =  edit_text(page)
+        page =  edit_text(page) + "\n"
         #Добавление дополнительного текста
-        if config.TEXT != "":
-            if config.TEXT_URL == "":
-                page += config.TEXT + "\n"
+        if config.FIRST_TEXT != "":
+            if config.FIRST_TEXT_URL == "":
+                page += "\n<b>" + config.FIRST_TEXT + "</b>\n"
             else:
-                page += f'<a href="{config.TEXT_URL}">{config.TEXT}</a>' + "\n"
+                page += f'\n<b><a href="{config.FIRST_TEXT_URL}">{config.FIRST_TEXT}</a></b>\n'
+        if config.SECOND_TEXT != "":
+            if config.SECOND_TEXT_URL == "":
+                page += "\n" + config.SECOND_TEXT + "\n"
+            else:
+                page += f'\n<a href="{config.SECOND_TEXT_URL}">{config.SECOND_TEXT}</a>' + "\n"
         res['page'] = page
         return res
     

@@ -34,16 +34,16 @@ async def run_bot():
     all_week_days = ["понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"]
     current_day = now.weekday()
     global IS_ERROR
-    if os.path.exists("restart.txt"):
-        with open("restart.txt", 'r') as file:
+    if os.path.exists("settings/restart.txt"):
+        with open("settings/restart.txt", 'r') as file:
             id = file.read().strip()
             await bot.send_message(id, "Бот запущен")
-        os.remove("restart.txt")
+        os.remove("settings/restart.txt")
     SCHEDULER = AsyncIOScheduler(timezone='Europe/Moscow')
     if all_week_days[current_day] in config.WORK_DAYS:
         if config.WORK_PERIOD != "off":
             try:
-                SCHEDULER.add_job(check_urls, trigger='interval', minutes=config.WORK_PERIOD)
+                SCHEDULER.add_job(check_urls, trigger='interval', minutes=int(config.WORK_PERIOD))
                 SCHEDULER.add_job(check_urls, trigger='date', next_run_time=datetime.datetime.now() + datetime.timedelta(seconds=10))
             except Exception as e:
                 print(e)
@@ -51,14 +51,16 @@ async def run_bot():
         if config.WORK_TIME[0] != "off":
             for time in config.WORK_TIME:
                 try:
-                    SCHEDULER.add_job(check_urls, trigger='date', next_run_time=time)
+                    time = time.strip()
+                    hour, minute = time.split(":")
+                    SCHEDULER.add_job(check_urls, trigger='cron', day="*", hour=hour, minute=minute)
                 except Exception as e:
                     print(e)
-                    IS_ERROR = True            
+                    IS_ERROR = True              
     SCHEDULER.start()
 
 def save_current_time_to_file():
-    with open("time.txt", 'w') as file:
+    with open("settings/time.txt", 'w') as file:
         current_time = datetime.datetime.now().strftime("%H:%M:%S %Y-%m-%d")
         file.write(current_time)
 
@@ -78,6 +80,10 @@ async def check_urls():
     global IS_ERROR
     RUNNING = True
     #Обработка всех ссылок в конфиге
+    if config.LIMIT_POST == "*" or config.LIMIT_POST == "off":
+        session_count = -2
+    else:
+        session_count = int(config.LIMIT_POST)
     for url in config.URL:
         if "forklog" in url:
             PM = ForkLog()
@@ -92,10 +98,17 @@ async def check_urls():
                 return False
             #Отсев дублей
             if BD.check_url_exist(URL):
-                continue
+               continue
 
+            if session_count != -2:
+                if session_count == 0:
+                    return True
             #Получение текста
-            dict = PM.get_page(URL)
+            try:
+                dict = PM.get_page(URL)
+            except Exception as e:
+                print(e)
+                continue
             if dict == -1:
                 continue  
             
@@ -119,6 +132,7 @@ async def check_urls():
                         photo = PM.get_image(URL)
                 else:
                     photo = PM.get_image(URL)
+
             BD.insert_url(URL)
             
             #Отправка в канал
@@ -158,6 +172,7 @@ async def check_urls():
                         print(e)
                         continue
             save_current_time_to_file()
+            session_count -= 1
     return True
     
 #Функция парсинга запускается командой post либо по расписанию функцией run_bot
@@ -203,7 +218,7 @@ async def process_callback_stop(msg: Message):
 
 async def get_last_bot_message_time():
     res = "Время последнего сообщения: "
-    with open("time.txt", 'r') as file:
+    with open("settings/time.txt", 'r') as file:
         time_str = file.read().strip()
         res += time_str + "\n"
     return res
@@ -223,7 +238,7 @@ async def process_callback_stop(msg: Message):
 @router.message(Command("restart"))
 async def restart(msg: Message):
     await msg.answer("Перезапуск бота...\n")
-    with open("restart.txt", 'w') as file:
+    with open("settings/restart.txt", 'w') as file:
         file.write(str(msg.from_user.id))
     python = sys.executable
     os.execl(python, python, *sys.argv)
